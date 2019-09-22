@@ -10,6 +10,7 @@ const shuffle = require('shuffle-array');
 
 const ISRANDOM = process.argv[2] === 'true';
 const multiplier = parseInt(process.argv[3]);
+const ISSSL = process.argv[4] == 'true';
 
 console.log(multiplier);
 
@@ -76,7 +77,7 @@ const init = async () => {
     resAx.data.forEach(p => {
       if (
         p.hasPOW === 1 &&
-        p.isSSL &&
+        (p.isSSL || !ISSSL) &&
         !latestMilestones.includes(p.latestMilestoneIndex)
       )
         latestMilestones.push(p.latestMilestoneIndex);
@@ -88,7 +89,7 @@ const init = async () => {
     resAx.data.forEach(p => {
       if (
         p.hasPOW === 1 &&
-        p.isSSL &&
+        (p.isSSL || !ISSSL) &&
         (ISRANDOM || p.latestMilestoneIndex === p.latestSolidSubtangleIndex)
       )
         iotaProviders.push({
