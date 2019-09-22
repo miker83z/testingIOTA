@@ -111,7 +111,7 @@ const init = async () => {
     bestScore = iotaProviders[0].score;
     // Pick the best n (if not random choice)
     if (!ISRANDOM) {
-      iotaProviders = iotaProviders.slice(0, bus.length);
+      iotaProviders = iotaProviders.slice(0, 2 * bus.length);
       shuffle(iotaProviders, { rng: seedrandom() });
     }
 
