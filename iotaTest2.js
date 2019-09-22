@@ -8,7 +8,10 @@ const seedrandom = require('seedrandom');
 const axios = require('axios');
 const shuffle = require('shuffle-array');
 
-const ISRANDOM = false;
+const ISRANDOM = process.argv[2] === 'true';
+const multiplier = parseInt(process.argv[3]);
+
+console.log(multiplier);
 
 let iotaProviders = [];
 let busObjs = {};
@@ -28,7 +31,7 @@ const bus = [
 ];
 
 let messageX = '';
-for (let i = 0; i < 270; i++) {
+for (let i = 0; i < 95 * multiplier; i++) {
   messageX += 'Hello IOTA ';
 }
 
@@ -63,7 +66,8 @@ const init = async () => {
   try {
     // Directory
     let dirTemp = 'data/';
-    if (ISRANDOM) dirTemp = 'data-RANDOM/RANDOM-';
+    if (multiplier === 1) dirTemp = 'datat/';
+    if (ISRANDOM) dirTemp += 'data-RANDOM/RANDOM-';
     const dir = dirTemp + new Date().toISOString();
 
     // Get public IOTA nodes
