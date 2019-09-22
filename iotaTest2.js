@@ -12,8 +12,6 @@ const ISRANDOM = process.argv[2] === 'true';
 const multiplier = parseInt(process.argv[3]);
 const ISSSL = process.argv[4] == 'true';
 
-console.log(multiplier);
-
 let iotaProviders = [];
 let busObjs = {};
 let latestMilestones = [];
@@ -91,9 +89,10 @@ const init = async () => {
         p.hasPOW === 1 &&
         (p.isSSL || !ISSSL) &&
         (ISRANDOM || p.latestMilestoneIndex === p.latestSolidSubtangleIndex)
-      )
+      ) {
+        const pref = p.isSSL ? 'https://' : 'http://';
         iotaProviders.push({
-          hostname: 'https://' + p.hostname + ':' + p.port,
+          hostname: pref + p.hostname + ':' + p.port,
           score:
             (p.freeMemory / p.maxMemory) *
             p.processors *
@@ -101,6 +100,7 @@ const init = async () => {
             (2 + 1 / (1 + p.load)) *
             (10 / (10 + latestMilestones[0] - p.latestMilestoneIndex))
         });
+      }
     });
     // Order by score and pick the best score
     iotaProviders = iotaProviders.sort((a, b) => {
