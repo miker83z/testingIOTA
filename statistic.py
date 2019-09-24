@@ -1,7 +1,7 @@
 import os
 import csv
 
-startingDir = 'data'
+startingDir = 'dataset/datat-RANDOM'
 
 
 def mean(l):
@@ -21,8 +21,9 @@ path = os.walk(startingDir)
 next(path)
 for directory in path:
     tempTestData = {
-        'name': directory[0].split('/')[1],
+        'name': directory[0].split('/')[2],
         'values': [],
+        'pows': [],
         'errors': 0
     }
     for csvFilename in directory[2]:
@@ -34,6 +35,7 @@ for directory in path:
                 providersData[provider] = {
                     'counter': 1,
                     'values': [],
+                    'pows': [],
                     'errors': 0,
                     'score': [firstRowProv[2]],
                     'scoreNorm': [firstRowProv[4]]
@@ -45,6 +47,7 @@ for directory in path:
 
             for row in reader:
                 value = int(row[0])
+                pows = int(row[0])
                 if value is -1:
                     providersData[provider]['errors'] += 1
                     tempTestData['errors'] += 1
@@ -52,7 +55,9 @@ for directory in path:
                 else:
                     providersData[provider]['values'].append(value)
                     tempTestData['values'].append(value)
-                    correctValues.append(value)
+                    providersData[provider]['pows'].append(pows)
+                    tempTestData['pows'].append(pows)
+                    correctValues.append(value+pows)
         csvFile.close()
 
     singleTestData.append(tempTestData)
@@ -65,11 +70,24 @@ providersPerform = [
         'name': x,
         'errorPerc': round(int(providersData[x]['errors']) / (int(providersData[x]
                                                                   ['errors']) + len(providersData[x]['values'])), 2),
-        'avgLatency': round(mean(providersData[x]['values']), 2),
+        'avgLatency': round(mean(providersData[x]['values']), 2) if len(providersData[x]['values']) > 0 else -1,
         'timesUsed': providersData[x]['counter']
     } for x in providersData.keys()
 ]
+providersNoError = []
+for x in providersData.keys():
+    if not round(int(providersData[x]['errors']) / (int(providersData[x]['errors']) + len(providersData[x]['values'])), 2):
+        providersNoError.append({
+            'name': x,
+            'avgLatency': round(mean(providersData[x]['values']), 2),
+            'timesUsed': providersData[x]['counter']
+        })
+
 valuesMean = mean(correctValues)
 errorsPerc = errors / (totalRequests * len(singleTestData))
 
-[print(x) for x in providersPerform]
+# [print(str(providersData) + str(providersData[x])) for x in providersData]
+[print(x) for x in providersNoError]
+print(valuesMean)
+print(errorsPerc)
+#[print(x['name'] + ' ' + str(len(x['values']) + x['errors'])) for x in singleTestData]

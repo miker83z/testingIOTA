@@ -1,19 +1,22 @@
 const fs = require('fs');
 const lineByLine = require('n-readlines');
 const liner = new lineByLine('out.csv');
-const IOTA = require('@iota/core');
-const converter = require('@iota/converter');
-const tconverter = require('@iota/transaction-converter');
 const createCsvWriter = require('csv-writer');
 const seedrandom = require('seedrandom');
 const axios = require('axios');
 const shuffle = require('shuffle-array');
 
+const IOTA = require('@iota/core');
+const converter = require('@iota/converter');
+const tconverter = require('@iota/transaction-converter');
+const MAMChannel = require('./MAMChannel');
+
 const ISMAM = process.argv[2] === 'true';
 const ISRANDOM = process.argv[3] === 'true';
-const multiplier = parseInt(process.argv[4]);
-const ISSSL = process.argv[5] == 'true';
+const ISSSL = process.argv[4] == 'true';
+const multiplier = parseInt(process.argv[5]);
 const iterations = parseInt(process.argv[6]);
+const sliceValue = parseInt(process.argv[7]);
 const bus = [
   '110',
   '226',
@@ -110,7 +113,7 @@ const setupProviders = async () => {
   bestScore = iotaProviders[0].score;
   // Pick the best n (if not random choice)
   if (!ISRANDOM) {
-    iotaProviders = iotaProviders.slice(0, 2 * bus.length);
+    iotaProviders = iotaProviders.slice(0, sliceValue);
     shuffle(iotaProviders, { rng: seedrandom() });
   }
 };
