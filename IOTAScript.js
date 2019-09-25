@@ -14,9 +14,14 @@ const MAMChannel = require('./MAMChannel');
 const ISMAM = process.argv[2] === 'true';
 const ISRANDOM = process.argv[3] === 'true';
 const ISSSL = process.argv[4] == 'true';
-const multiplier = parseInt(process.argv[5]);
-const iterations = parseInt(process.argv[6]);
-const sliceValue = parseInt(process.argv[7]);
+const ISDEVNET = process.argv[5] == 'true';
+const multiplier = parseInt(process.argv[6]);
+const iterations = parseInt(process.argv[7]);
+const sliceValue = parseInt(process.argv[8]);
+const devnetProv = {
+  hostname: 'https://nodes.devnet.thetangle.org:443',
+  score: 1
+};
 const bus = [
   '110',
   '226',
@@ -128,7 +133,8 @@ const init = async () => {
     else dirTemp += '/';
     const dir = dirTemp + new Date().toISOString();
 
-    await setupProviders();
+    if (ISDEVNET) iotaProviders.push(devnetProv);
+    else await setupProviders();
 
     // For each bus setup a MAM channel or IOTA api, then create a log file
     for (let i = 0; i < bus.length; i++) {
@@ -165,7 +171,7 @@ const init = async () => {
           provider.score +
           ' scoreNorm: ' +
           provider.score / bestScore +
-          (ISMAM ? tempChannel.getRoot() : '') +
+          (ISMAM ? ' ' + tempChannel.getRoot() : '') +
           '\n',
         err => {
           if (err) throw err;
@@ -251,28 +257,28 @@ const publish = async row => {
 };
 
 // Publishing a message json on a channel
-const publishOnMAM = (row, json) => {
-  busObjs[row[1]].channel
-    .publish(json)
-    .then(resp => {
-      const attachmentTime = resp.bundle[0].attachmentTimestamp;
-      const timeDifference = attachmentTime - resp.startTime;
-      console.log('bus ' + row[1] + ': ' + timeDifference + ' ms');
+const publishOnMAM = async (row, json) => {
+  let minWeightMagn = 14;
+  if (ISDEVNET) minWeightMagn = 9;
+  try {
+    const resp = await busObjs[row[1]].channel.publish(json, minWeightMagn);
+    const attachmentTime = resp.bundle[0].attachmentTimestamp;
+    const timeDifference = attachmentTime - resp.startTime;
+    console.log('bus ' + row[1] + ': ' + timeDifference + ' ms');
 
-      fs.appendFile(
-        busObjs[row[1]].csv,
-        timeDifference + ',' + row[4] + '\n',
-        err => {
-          if (err) throw err;
-        }
-      );
-    })
-    .catch(err => {
-      console.log(err);
-      fs.appendFile(busObjs[row[1]].csv, '-1' + ',' + row[4] + '\n', err => {
+    fs.appendFile(
+      busObjs[row[1]].csv,
+      timeDifference + ',' + row[4] + '\n',
+      err => {
         if (err) throw err;
-      });
+      }
+    );
+  } catch (err) {
+    console.log(err);
+    fs.appendFile(busObjs[row[1]].csv, '-1' + ',' + row[4] + '\n', err => {
+      if (err) throw err;
     });
+  }
 };
 
 // Main phase, reading buses behavior in order to publish messages to MAM channels

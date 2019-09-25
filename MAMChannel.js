@@ -71,7 +71,7 @@ class MAMChannel {
    * @param {Object} packet - The message (a JSON object)
    * @returns {String} The message's root
    */
-  async publish(packet) {
+  async publish(packet, mwm) {
     const trytes = converter.asciiToTrytes(JSON.stringify(packet));
     const message = MAM.create(this.mamState, trytes);
     this.mamState = message.state;
@@ -79,7 +79,7 @@ class MAMChannel {
     const startTime = new Date().getTime();
 
     // Attach the payload to the channel
-    const bundle = await MAM.attach(message.payload, message.address, 3, 14);
+    const bundle = await MAM.attach(message.payload, message.address, 3, mwm);
 
     return {
       startTime,
