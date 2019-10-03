@@ -9,15 +9,32 @@ const shuffle = require('shuffle-array');
 const IOTA = require('@iota/core');
 const converter = require('@iota/converter');
 const tconverter = require('@iota/transaction-converter');
-const MAMChannel = require('./MAMChannel');
+const MAM = require('@iota/mam');
 
-const ISMAM = process.argv[2] === 'true';
-const ISRANDOM = process.argv[3] === 'true';
-const ISSSL = process.argv[4] == 'true';
-const ISDEVNET = process.argv[5] == 'true';
-const multiplier = parseInt(process.argv[6]);
-const iterations = parseInt(process.argv[7]);
-const sliceValue = parseInt(process.argv[8]);
+const optionDefinitions = [
+  { name: 'mam', alias: 'm', type: Boolean, defaultValue: false },
+  { name: 'random', alias: 'r', type: Boolean, defaultValue: false },
+  { name: 'ssl', alias: 's', type: Boolean, defaultValue: false },
+  { name: 'devnet', alias: 'd', type: Boolean, defaultValue: false },
+  { name: 'showpow', alias: 'p', type: Boolean, defaultValue: false },
+  { name: 'single', alias: 't', type: Boolean, defaultValue: false },
+  { name: 'mul', alias: 'x', type: Number, defaultValue: 3 },
+  { name: 'iter', alias: 'i', type: Number, defaultValue: 1 },
+  { name: 'slice', alias: 'v', type: Number, defaultValue: 20 }
+];
+const commandLineArgs = require('command-line-args');
+const options = commandLineArgs(optionDefinitions);
+
+const ISMAM = options.mam;
+const ISRANDOM = options.random;
+const ISSSL = options.ssl;
+const ISDEVNET = options.devnet;
+const SHOWPOW = options.showpow;
+let multiplier = 3;
+if (options.single) multiplier = 1;
+else if (options.mul) multiplier = options.mul;
+const iterations = options.iter ? options.iter : 1;
+const sliceValue = options.slice ? options.slice : 20;
 const devnetProv = {
   hostname: 'https://nodes.devnet.thetangle.org:443',
   score: 1
@@ -138,11 +155,12 @@ const init = async () => {
 
     // For each bus setup a MAM channel or IOTA api, then create a log file
     for (let i = 0; i < bus.length; i++) {
+      const seed = iotaSeedGen();
       // Bus object
       busObjs[bus[i]] = {
         channel: null,
         csv: null,
-        seed: iotaSeedGen('seed9999999' + bus[i])
+        seed
       };
 
       // Setup MAM Channel or IOTA api
@@ -153,8 +171,8 @@ const init = async () => {
       // Channel
       let tempChannel = null;
       if (ISMAM) {
-        tempChannel = new MAMChannel('private', provider.hostname);
-        tempChannel.openChannel();
+        tempChannel = MAM.init(provider.hostname, seed);
+        tempChannel = MAM.changeMode(tempChannel, 'private');
       } else {
         tempChannel = IOTA.composeAPI({ provider: provider.hostname });
       }
@@ -171,7 +189,7 @@ const init = async () => {
           provider.score +
           ' scoreNorm: ' +
           provider.score / bestScore +
-          (ISMAM ? ' ' + tempChannel.getRoot() : '') +
+          (ISMAM ? ' ' + MAM.getRoot(tempChannel) : '') +
           '\n',
         err => {
           if (err) throw err;
@@ -222,28 +240,44 @@ const publish = async row => {
     );
     await busObjs[row[1]].channel.storeAndBroadcast(attachedTrytes);
     const bundle = attachedTrytes.map(t => tconverter.asTransactionObject(t));
+    const finishTime = new Date().getTime();
 
-    //console.log(bundle);
+    // Compute latency
     const attachmentTime = bundle[0].attachmentTimestamp;
     tipsDifference = tipsTime - startTime;
     powDifference = attachmentTime - tipsTime;
-    console.log(
-      'bus ' +
-        row[1] +
-        ': tips ' +
-        tipsDifference +
-        'ms, pow ' +
-        powDifference +
-        'ms'
-    );
+    const timeDifference = attachmentTime - startTime;
+    const totalLatency = finishTime - startTime;
+    let stringToSave = '';
+    if (SHOWPOW) {
+      console.log(
+        'bus ' +
+          row[1] +
+          ': tips ' +
+          tipsDifference +
+          'ms, pow ' +
+          powDifference +
+          'ms'
+      );
+      stringToSave = tipsDifference + ',' + powDifference + ',' + row[4] + '\n';
+    } else {
+      console.log(
+        'bus ' + row[1] + ': ' + timeDifference + ' ms,' + totalLatency + ' ms'
+      );
+      stringToSave =
+        startTime +
+        ',' +
+        attachmentTime +
+        ',' +
+        finishTime +
+        ',' +
+        row[4] +
+        '\n';
+    }
 
-    fs.appendFile(
-      busObjs[row[1]].csv,
-      tipsDifference + ',' + powDifference + ',' + row[4] + '\n',
-      err => {
-        if (err) throw err;
-      }
-    );
+    fs.appendFile(busObjs[row[1]].csv, stringToSave, err => {
+      if (err) throw err;
+    });
   } catch (err) {
     console.log(err);
     fs.appendFile(
@@ -260,24 +294,47 @@ const publish = async row => {
 const publishOnMAM = async (row, json) => {
   let minWeightMagn = 14;
   if (ISDEVNET) minWeightMagn = 9;
+  let startTime = -1;
   try {
-    const resp = await busObjs[row[1]].channel.publish(json, minWeightMagn);
-    const attachmentTime = resp.bundle[0].attachmentTimestamp;
-    const timeDifference = attachmentTime - resp.startTime;
-    console.log('bus ' + row[1] + ': ' + timeDifference + ' ms');
+    // Prepare message
+    const trytes = converter.asciiToTrytes(JSON.stringify(json));
+    const message = MAM.create(busObjs[row[1]].channel, trytes);
+    busObjs[row[1]].channel = message.state;
+
+    // Attach the payload to the channel
+    startTime = new Date().getTime();
+    const bundle = await MAM.attach(
+      message.payload,
+      message.address,
+      3,
+      minWeightMagn
+    );
+    const finishTime = new Date().getTime();
+
+    // Compute latency
+    const attachmentTime = bundle[0].attachmentTimestamp;
+    const timeDifference = attachmentTime - startTime;
+    const totalLatency = finishTime - startTime;
+    console.log(
+      'bus ' + row[1] + ': ' + timeDifference + ' ms,' + totalLatency + ' ms'
+    );
 
     fs.appendFile(
       busObjs[row[1]].csv,
-      timeDifference + ',' + row[4] + '\n',
+      startTime + ',' + attachmentTime + ',' + finishTime + ',' + row[4] + '\n',
       err => {
         if (err) throw err;
       }
     );
   } catch (err) {
     console.log(err);
-    fs.appendFile(busObjs[row[1]].csv, '-1' + ',' + row[4] + '\n', err => {
-      if (err) throw err;
-    });
+    fs.appendFile(
+      busObjs[row[1]].csv,
+      startTime + ',-1,-1,' + row[4] + '\n',
+      err => {
+        if (err) throw err;
+      }
+    );
   }
 };
 

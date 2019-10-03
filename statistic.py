@@ -1,7 +1,7 @@
 import os
 import csv
 
-startingDir = 'dataset/datat-RANDOM'
+startingDir = 'dataset/data-1'
 
 
 def mean(l):
@@ -87,7 +87,7 @@ valuesMean = mean(correctValues)
 errorsPerc = errors / (totalRequests * len(singleTestData))
 
 # [print(str(providersData) + str(providersData[x])) for x in providersData]
-[print(x) for x in providersNoError]
-print(valuesMean)
-print(errorsPerc)
+#[print(x) for x in providersNoError]
+# print(valuesMean)
+# print(errorsPerc)
 #[print(x['name'] + ' ' + str(len(x['values']) + x['errors'])) for x in singleTestData]
