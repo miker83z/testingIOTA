@@ -11,30 +11,34 @@ const converter = require('@iota/converter');
 const tconverter = require('@iota/transaction-converter');
 const MAM = require('@iota/mam');
 
+// Command line arguments
 const optionDefinitions = [
-  { name: 'mam', alias: 'm', type: Boolean, defaultValue: false },
+  { name: 'notmam', alias: 'n', type: Boolean, defaultValue: false },
   { name: 'random', alias: 'r', type: Boolean, defaultValue: false },
-  { name: 'ssl', alias: 's', type: Boolean, defaultValue: false },
   { name: 'devnet', alias: 'd', type: Boolean, defaultValue: false },
   { name: 'showpow', alias: 'p', type: Boolean, defaultValue: false },
   { name: 'single', alias: 't', type: Boolean, defaultValue: false },
   { name: 'mul', alias: 'x', type: Number, defaultValue: 3 },
   { name: 'iter', alias: 'i', type: Number, defaultValue: 1 },
-  { name: 'slice', alias: 'v', type: Number, defaultValue: 20 }
+  { name: 'slice', alias: 's', type: Number, defaultValue: 20 }
 ];
 const commandLineArgs = require('command-line-args');
 const options = commandLineArgs(optionDefinitions);
 
-const ISMAM = options.mam;
+// Path defining attributes
+let ISNOTMAM = options.notmam;
 const ISRANDOM = options.random;
-const ISSSL = options.ssl;
 const ISDEVNET = options.devnet;
 const SHOWPOW = options.showpow;
-let multiplier = 3;
-if (options.single) multiplier = 1;
-else if (options.mul) multiplier = options.mul;
+let multiplier = options.mul;
+if (options.single) {
+  ISNOTMAM = true;
+  multiplier = 1;
+}
 const iterations = options.iter ? options.iter : 1;
 const sliceValue = options.slice ? options.slice : 20;
+
+// Constant Values
 const devnetProv = {
   hostname: 'https://nodes.devnet.thetangle.org:443',
   score: 1
@@ -58,7 +62,7 @@ const setupEnvironment = () => {
   busObjs = {};
   latestMilestones = [];
   bestScore = 1;
-  if (!ISMAM) {
+  if (ISNOTMAM) {
     messageX = '';
     for (let i = 0; i < 95 * multiplier; i++) {
       messageX += 'Hello IOTA ';
@@ -97,11 +101,7 @@ const setupProviders = async () => {
   const resAx = await axios.get('https://api.iota-nodes.net/');
   // Check for latest global milestone index
   resAx.data.forEach(p => {
-    if (
-      p.hasPOW === 1 &&
-      (p.isSSL || !ISSSL) &&
-      !latestMilestones.includes(p.latestMilestoneIndex)
-    )
+    if (p.hasPOW === 1 && !latestMilestones.includes(p.latestMilestoneIndex))
       latestMilestones.push(p.latestMilestoneIndex);
   });
   latestMilestones = latestMilestones.sort((a, b) => {
@@ -111,7 +111,6 @@ const setupProviders = async () => {
   resAx.data.forEach(p => {
     if (
       p.hasPOW === 1 &&
-      (p.isSSL || !ISSSL) &&
       (ISRANDOM || p.latestMilestoneIndex === p.latestSolidSubtangleIndex)
     ) {
       const pref = p.isSSL ? 'https://' : 'http://';
@@ -146,6 +145,7 @@ const init = async () => {
     // Directory
     let dirTemp = 'dataset/data';
     if (multiplier === 1) dirTemp += 't';
+    if (SHOWPOW && ISNOTMAM) dirTemp += '-POW';
     if (ISRANDOM) dirTemp += '-RANDOM/RANDOM-';
     else dirTemp += '/';
     const dir = dirTemp + new Date().toISOString();
@@ -170,11 +170,11 @@ const init = async () => {
       else provider = selectProvider(i);
       // Channel
       let tempChannel = null;
-      if (ISMAM) {
+      if (ISNOTMAM)
+        tempChannel = IOTA.composeAPI({ provider: provider.hostname });
+      else {
         tempChannel = MAM.init(provider.hostname, seed);
         tempChannel = MAM.changeMode(tempChannel, 'private');
-      } else {
-        tempChannel = IOTA.composeAPI({ provider: provider.hostname });
       }
       busObjs[bus[i]].channel = tempChannel;
 
@@ -189,7 +189,7 @@ const init = async () => {
           provider.score +
           ' scoreNorm: ' +
           provider.score / bestScore +
-          (ISMAM ? ' ' + MAM.getRoot(tempChannel) : '') +
+          (!ISNOTMAM ? ' ' + MAM.getRoot(tempChannel) : '') +
           '\n',
         err => {
           if (err) throw err;
@@ -201,25 +201,27 @@ const init = async () => {
   }
 };
 
-// Publishing a transaction on IOTA
+// Publishing transactions on IOTA
 const publish = async row => {
-  let tipsDifference = -1,
-    powDifference = -1;
+  let startTime = -1,
+    tipsObtainedTime = -1,
+    attachmentTime = -1,
+    finishTime = -1;
+  const transfers = [
+    {
+      address: iotaSeedGen('recipient9999999kh' + new Date()),
+      value: 0,
+      tag: '',
+      message: converter.asciiToTrytes(
+        JSON.stringify({
+          payload: messageX,
+          timestamp: new Date().getTime()
+        })
+      )
+    }
+  ];
   try {
-    const transfers = [
-      {
-        address: iotaSeedGen('recipient9999999kh' + new Date()),
-        value: 0, // 1Ki
-        tag: '', // optional tag of `0-27` trytes
-        message: converter.asciiToTrytes(
-          JSON.stringify({
-            payload: messageX,
-            timestamp: new Date().getTime()
-          })
-        ) // optional message in trytes
-      }
-    ];
-    const startTime = new Date().getTime();
+    startTime = new Date().getTime();
     // Prepare a bundle and signs it.
     const trytes = await busObjs[row[1]].channel.prepareTransfers(
       busObjs[row[1]].seed,
@@ -230,7 +232,7 @@ const publish = async row => {
     const { trunkTransaction, branchTransaction } = await busObjs[
       row[1]
     ].channel.getTransactionsToApprove(3);
-    const tipsTime = new Date().getTime();
+    tipsObtainedTime = new Date().getTime();
 
     const attachedTrytes = await busObjs[row[1]].channel.attachToTangle(
       trunkTransaction,
@@ -240,49 +242,44 @@ const publish = async row => {
     );
     await busObjs[row[1]].channel.storeAndBroadcast(attachedTrytes);
     const bundle = attachedTrytes.map(t => tconverter.asTransactionObject(t));
-    const finishTime = new Date().getTime();
+    finishTime = new Date().getTime();
+    attachmentTime = bundle[0].attachmentTimestamp;
 
     // Compute latency
-    const attachmentTime = bundle[0].attachmentTimestamp;
-    tipsDifference = tipsTime - startTime;
-    powDifference = attachmentTime - tipsTime;
-    const timeDifference = attachmentTime - startTime;
-    const totalLatency = finishTime - startTime;
-    let stringToSave = '';
-    if (SHOWPOW) {
+    if (SHOWPOW)
       console.log(
         'bus ' +
           row[1] +
           ': tips ' +
-          tipsDifference +
+          (tipsObtainedTime - startTime) +
           'ms, pow ' +
-          powDifference +
+          (finishTime - tipsObtainedTime) +
           'ms'
       );
-      stringToSave = tipsDifference + ',' + powDifference + ',' + row[4] + '\n';
-    } else {
+    else
       console.log(
-        'bus ' + row[1] + ': ' + timeDifference + ' ms,' + totalLatency + ' ms'
+        'bus ' +
+          row[1] +
+          ': ' +
+          (attachmentTime - startTime) +
+          ' ms, ' +
+          (finishTime - startTime) +
+          ' ms'
       );
-      stringToSave =
-        startTime +
+  } catch (err) {
+    console.log(row[1] + ': ' + err);
+  } finally {
+    fs.appendFile(
+      busObjs[row[1]].csv,
+      startTime +
         ',' +
+        (SHOWPOW ? tipsObtainedTime + ',' : '') +
         attachmentTime +
         ',' +
         finishTime +
         ',' +
         row[4] +
-        '\n';
-    }
-
-    fs.appendFile(busObjs[row[1]].csv, stringToSave, err => {
-      if (err) throw err;
-    });
-  } catch (err) {
-    console.log(err);
-    fs.appendFile(
-      busObjs[row[1]].csv,
-      tipsDifference + ',' + powDifference + ',' + row[4] + '\n',
+        '\n',
       err => {
         if (err) throw err;
       }
@@ -294,7 +291,9 @@ const publish = async row => {
 const publishOnMAM = async (row, json) => {
   let minWeightMagn = 14;
   if (ISDEVNET) minWeightMagn = 9;
-  let startTime = -1;
+  let startTime = -1,
+    attachmentTime = -1,
+    finishTime = -1;
   try {
     // Prepare message
     const trytes = converter.asciiToTrytes(JSON.stringify(json));
@@ -309,28 +308,25 @@ const publishOnMAM = async (row, json) => {
       3,
       minWeightMagn
     );
-    const finishTime = new Date().getTime();
+    finishTime = new Date().getTime();
+    attachmentTime = bundle[0].attachmentTimestamp;
 
     // Compute latency
-    const attachmentTime = bundle[0].attachmentTimestamp;
-    const timeDifference = attachmentTime - startTime;
-    const totalLatency = finishTime - startTime;
     console.log(
-      'bus ' + row[1] + ': ' + timeDifference + ' ms,' + totalLatency + ' ms'
+      'bus ' +
+        row[1] +
+        ': ' +
+        (attachmentTime - startTime) +
+        ' ms, ' +
+        (finishTime - startTime) +
+        ' ms'
     );
-
+  } catch (err) {
+    console.log(row[1] + ': ' + err);
+  } finally {
     fs.appendFile(
       busObjs[row[1]].csv,
       startTime + ',' + attachmentTime + ',' + finishTime + ',' + row[4] + '\n',
-      err => {
-        if (err) throw err;
-      }
-    );
-  } catch (err) {
-    console.log(err);
-    fs.appendFile(
-      busObjs[row[1]].csv,
-      startTime + ',-1,-1,' + row[4] + '\n',
       err => {
         if (err) throw err;
       }
@@ -347,14 +343,12 @@ const go = async () => {
       console.log('Waiting ' + row[0] + ' seconds for bus ' + row[1]);
       await sleep(parseInt(row[0]) * 1000);
 
-      if (ISMAM) {
+      if (ISNOTMAM) publish(row);
+      else
         publishOnMAM(row, {
           payload: { latitude: row[2], longitude: row[3] },
           timestampISO: new Date().toISOString()
         });
-      } else {
-        publish(row);
-      }
     }
   } catch (error) {
     console.log(error);
