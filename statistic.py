@@ -1,14 +1,15 @@
 import os
 import csv
 
-startingDir = 'dataset/data-1'
+startingDir = 'dataset/datat'
+ISPOW = False
 
 
 def mean(l):
     tmp = 0
     for x in l:
         tmp += int(x)
-    return tmp / len(l)
+    return tmp / max(1, len(l))
 
 
 totalRequests = 447
@@ -46,18 +47,22 @@ for directory in path:
                 providersData[provider]['scoreNorm'].append(firstRowProv[4])
 
             for row in reader:
-                value = int(row[0])
-                pows = int(row[0])
-                if value is -1:
+                srt = int(row[0])
+                fin = int(row[2]) if not ISPOW else int(row[3])
+                tips = int(row[1])
+                if fin is -1:
                     providersData[provider]['errors'] += 1
                     tempTestData['errors'] += 1
                     errors += 1
                 else:
+                    value = fin - srt if not ISPOW else tips - srt
+                    if ISPOW:
+                        pows = fin - tips
+                        providersData[provider]['pows'].append(pows)
+                        tempTestData['pows'].append(pows)
+                        correctValues.append(value+pows)
                     providersData[provider]['values'].append(value)
                     tempTestData['values'].append(value)
-                    providersData[provider]['pows'].append(pows)
-                    tempTestData['pows'].append(pows)
-                    correctValues.append(value+pows)
         csvFile.close()
 
     singleTestData.append(tempTestData)
@@ -90,4 +95,5 @@ errorsPerc = errors / (totalRequests * len(singleTestData))
 #[print(x) for x in providersNoError]
 # print(valuesMean)
 # print(errorsPerc)
-#[print(x['name'] + ' ' + str(len(x['values']) + x['errors'])) for x in singleTestData]
+[print(x['name'] + ' ' + str(len(x['values']) + x['errors']))
+ for x in singleTestData]
