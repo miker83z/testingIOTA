@@ -5,22 +5,31 @@ const createCsvWriter = require('csv-writer');
 const seedrandom = require('seedrandom');
 const axios = require('axios');
 const shuffle = require('shuffle-array');
+const assert = require('assert');
 
 const IOTA = require('@iota/core');
 const converter = require('@iota/converter');
 const tconverter = require('@iota/transaction-converter');
 const MAM = require('@iota/mam');
+const ccurl = require('ccurl.interface.js');
 
 // Command line arguments
 const optionDefinitions = [
   { name: 'notmam', alias: 'n', type: Boolean, defaultValue: false },
   { name: 'random', alias: 'r', type: Boolean, defaultValue: false },
   { name: 'devnet', alias: 'd', type: Boolean, defaultValue: false },
+  { name: 'localpow', alias: 'l', type: Boolean, defaultValue: false },
   { name: 'showpow', alias: 'p', type: Boolean, defaultValue: false },
   { name: 'single', alias: 't', type: Boolean, defaultValue: false },
   { name: 'mul', alias: 'x', type: Number, defaultValue: 3 },
   { name: 'iter', alias: 'i', type: Number, defaultValue: 1 },
-  { name: 'slice', alias: 's', type: Number, defaultValue: 20 }
+  { name: 'slice', alias: 's', type: Number, defaultValue: 20 },
+  {
+    name: 'ccurl',
+    alias: 'c',
+    type: String,
+    defaultValue: '../ccurl/build/lib'
+  }
 ];
 const commandLineArgs = require('command-line-args');
 const options = commandLineArgs(optionDefinitions);
@@ -29,7 +38,9 @@ const options = commandLineArgs(optionDefinitions);
 let ISNOTMAM = options.notmam;
 const ISRANDOM = options.random;
 const ISDEVNET = options.devnet;
-const SHOWPOW = options.showpow;
+const ISLOCALPOW = options.localpow;
+let SHOWPOW = options.showpow;
+if (ISLOCALPOW) SHOWPOW = true;
 let multiplier = options.mul;
 if (options.single) {
   ISNOTMAM = true;
@@ -37,6 +48,7 @@ if (options.single) {
 }
 const iterations = options.iter ? options.iter : 1;
 const sliceValue = options.slice ? options.slice : 20;
+const ccurlpath = options.ccurl;
 
 // Constant Values
 const devnetProv = {
@@ -69,6 +81,32 @@ const setupEnvironment = () => {
     }
   }
 };
+
+const localAttachToTangle = (
+  trunkTransaction,
+  branchTransaction,
+  minWeightMagnitude,
+  trytes,
+  callback
+) =>
+  new Promise((resolve, reject) => {
+    ccurl(
+      trunkTransaction,
+      branchTransaction,
+      minWeightMagnitude,
+      trytes,
+      ccurlpath,
+      (err, result) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+        assert.equal(result.length, trytes.length);
+        console.log(trytes.length + ' transactions hashed. OK');
+        resolve(result);
+      }
+    );
+  });
 
 const iotaSeedGen = key => {
   const rng = seedrandom(key);
@@ -153,6 +191,8 @@ const init = async () => {
     if (ISDEVNET) iotaProviders.push(devnetProv);
     else await setupProviders();
 
+    if (ISLOCALPOW) MAM.setAttachToTangle(localAttachToTangle);
+
     // For each bus setup a MAM channel or IOTA api, then create a log file
     for (let i = 0; i < bus.length; i++) {
       const seed = iotaSeedGen();
@@ -170,9 +210,10 @@ const init = async () => {
       else provider = selectProvider(i);
       // Channel
       let tempChannel = null;
-      if (ISNOTMAM)
+      if (ISNOTMAM) {
         tempChannel = IOTA.composeAPI({ provider: provider.hostname });
-      else {
+        if (ISLOCALPOW) tempChannel.attachToTangle = localAttachToTangle;
+      } else {
         tempChannel = MAM.init(provider.hostname, seed);
         tempChannel = MAM.changeMode(tempChannel, 'private');
       }
