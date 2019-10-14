@@ -15,11 +15,12 @@ const ccurl = require('ccurl.interface.js');
 
 // Command line arguments
 const optionDefinitions = [
+  { name: 'keepinitial', alias: 'k', type: Boolean, defaultValue: true },
   { name: 'notmam', alias: 'n', type: Boolean, defaultValue: false },
   { name: 'random', alias: 'r', type: Boolean, defaultValue: false },
-  { name: 'devnet', alias: 'd', type: Boolean, defaultValue: false },
   { name: 'localpow', alias: 'l', type: Boolean, defaultValue: false },
   { name: 'showpow', alias: 'p', type: Boolean, defaultValue: false },
+  { name: 'devnet', alias: 'd', type: Boolean, defaultValue: false },
   { name: 'single', alias: 't', type: Boolean, defaultValue: false },
   { name: 'mul', alias: 'x', type: Number, defaultValue: 3 },
   { name: 'iter', alias: 'i', type: Number, defaultValue: 1 },
@@ -35,12 +36,13 @@ const commandLineArgs = require('command-line-args');
 const options = commandLineArgs(optionDefinitions);
 
 // Path defining attributes
+const KEEPINITIALP = options.keepinitial;
 let ISNOTMAM = options.notmam;
 const ISRANDOM = options.random;
-const ISDEVNET = options.devnet;
 const ISLOCALPOW = options.localpow;
 let SHOWPOW = options.showpow;
 if (ISLOCALPOW) SHOWPOW = true;
+const ISDEVNET = options.devnet;
 let multiplier = options.mul;
 if (options.single) {
   ISNOTMAM = true;
@@ -55,7 +57,9 @@ const devnetProv = {
   hostname: 'https://nodes.devnet.thetangle.org:443',
   score: 1
 };
-const bus = [
+const providersFetchInterval = 10000;
+const alpha = 1 / 4;
+const busConst = [
   '110',
   '226',
   '371',
@@ -67,11 +71,11 @@ const bus = [
   '484',
   '422'
 ];
-let iotaProviders, busObjs, latestMilestones, bestScore, messageX;
+let iotaProviders, bus, latestMilestones, bestScore, messageX, previousFetch;
 
 const setupEnvironment = () => {
   iotaProviders = [];
-  busObjs = {};
+  bus = {};
   latestMilestones = [];
   bestScore = 1;
   if (ISNOTMAM) {
@@ -80,6 +84,24 @@ const setupEnvironment = () => {
       messageX += 'Hello IOTA ';
     }
   }
+  previousFetch = 0;
+};
+const iotaSeedGen = key => {
+  const rng = seedrandom(key);
+  const iotaSeedLength = 81;
+  const seedCharset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ9';
+  let result = '';
+
+  for (let i = 0; i < iotaSeedLength; i++) {
+    const x = Math.round(rng() * seedCharset.length) % seedCharset.length;
+    result += seedCharset[x];
+  }
+
+  return result;
+};
+
+const sleep = ms => {
+  return new Promise(resolve => setTimeout(resolve, ms));
 };
 
 const localAttachToTangle = (
@@ -108,85 +130,110 @@ const localAttachToTangle = (
     );
   });
 
-const iotaSeedGen = key => {
-  const rng = seedrandom(key);
-  const iotaSeedLength = 81;
-  const seedCharset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ9';
-  let result = '';
-
-  for (let i = 0; i < iotaSeedLength; i++) {
-    const x = Math.round(rng() * seedCharset.length) % seedCharset.length;
-    result += seedCharset[x];
+// If KEEPINITIALP his function is executed only once
+const setupProviders = async () => {
+  // Get public IOTA nodes
+  const resAx = await axios.get('https://api.iota-nodes.net/');
+  // Check for latest global milestone index
+  resAx.data.forEach(p => {
+    // Only pick providers who execute POW and (internally) synced
+    if (
+      p.hasPOW === 1 &&
+      p.latestMilestoneIndex === p.latestSolidSubtangleIndex
+    ) {
+      const pref = p.isSSL ? 'https://' : 'http://';
+      iotaProviders.push({
+        hostname: pref + p.hostname + ':' + p.port,
+        latestMil: p.latestMilestoneIndex,
+        score:
+          (p.freeMemory / p.maxMemory) *
+          p.processors *
+          p.neighbors *
+          (2 + 1 / (1 + p.load))
+      });
+      if (!latestMilestones.includes(p.latestMilestoneIndex))
+        latestMilestones.push(p.latestMilestoneIndex);
+    }
+  });
+  // Sort in order to find latest milestone
+  latestMilestones = latestMilestones.sort((a, b) => {
+    return b - a;
+  });
+  iotaProviders = iotaProviders.filter(e => {
+    return e.latestMil !== latestMilestones[0];
+  });
+  if (KEEPINITIALP) {
+    // Order by score and pick the best score
+    iotaProviders = iotaProviders.sort((a, b) => {
+      if (a.score < b.score) return 1;
+      if (a.score > b.score) return -1;
+      return 0;
+    });
+    bestScore = iotaProviders[0].score;
+    // Pick the best n (if not random choice)
+    if (!ISRANDOM) {
+      iotaProviders = iotaProviders.slice(0, sliceValue);
+      shuffle(iotaProviders, { rng: seedrandom() });
+    }
   }
-
-  return result;
-};
-
-const sleep = ms => {
-  return new Promise(resolve => setTimeout(resolve, ms));
 };
 
 const selectProvider = x => {
   return iotaProviders[x % iotaProviders.length];
 };
 
+// Return a synced random provider
 const selectRandomProvider = () => {
   return shuffle.pick(iotaProviders, { rng: seedrandom() });
 };
 
-const setupProviders = async () => {
-  // Get public IOTA nodes
-  const resAx = await axios.get('https://api.iota-nodes.net/');
-  // Check for latest global milestone index
-  resAx.data.forEach(p => {
-    if (p.hasPOW === 1 && !latestMilestones.includes(p.latestMilestoneIndex))
-      latestMilestones.push(p.latestMilestoneIndex);
-  });
-  latestMilestones = latestMilestones.sort((a, b) => {
-    return b - a;
-  });
-  // Calculate scores for providers
-  resAx.data.forEach(p => {
-    if (
-      p.hasPOW === 1 &&
-      (ISRANDOM || p.latestMilestoneIndex === p.latestSolidSubtangleIndex)
-    ) {
-      const pref = p.isSSL ? 'https://' : 'http://';
-      iotaProviders.push({
-        hostname: pref + p.hostname + ':' + p.port,
-        score:
-          (p.freeMemory / p.maxMemory) *
-          p.processors *
-          p.neighbors *
-          (2 + 1 / (1 + p.load)) *
-          (10 / (10 + latestMilestones[0] - p.latestMilestoneIndex))
-      });
-    }
-  });
-  // Order by score and pick the best score
-  iotaProviders = iotaProviders.sort((a, b) => {
-    if (a.score < b.score) return 1;
-    if (a.score > b.score) return -1;
-    return 0;
-  });
-  bestScore = iotaProviders[0].score;
-  // Pick the best n (if not random choice)
-  if (!ISRANDOM) {
-    iotaProviders = iotaProviders.slice(0, sliceValue);
-    shuffle(iotaProviders, { rng: seedrandom() });
+const fetchRandomProvider = async () => {
+  // If public providers have not been fetched recently
+  let actualTime = new Date().getTime();
+  if (actualTime > previousFetch + providersFetchInterval) {
+    previousFetch = actualTime;
+    await setupProviders();
   }
+  return selectRandomProvider();
+};
+
+const selectBestKnownProvider = b => {
+  // Order known providers by RTT
+  const orderedBestProviders = Array.from(
+    Object.keys(bus[b].providersRTT),
+    x => [x, bus[b].providersRTT[x]]
+  ).sort((a, b) => {
+    return a[1] - b[1];
+  });
+  // Return the best provider that is not waiting
+  for (let i = 0; i < orderedBestProviders.length; i++) {
+    let provider = orderedBestProviders[i][0];
+    if (!bus[b].waiting.has(provider)) return provider; // Assuming synced
+  }
+  return orderedBestProviders[0][0]; // Should never occur
 };
 
 // Initial phase, creating log files and opening MAM channels
 const init = async () => {
   try {
     // Directory
-    let dirTemp = 'dataset/data';
-    if (multiplier === 1) dirTemp += 't';
+    let dirTemp = 'dataset/';
+    if (KEEPINITIALP) dirTemp += 'keep/';
+    else dirTemp += 'keep-NOT/';
+    if (ISNOTMAM) dirTemp += 'mam-NOT/';
+    else dirTemp += 'mam/';
+    if (ISRANDOM) dirTemp += 'random/';
+    else dirTemp += 'random-NOT/';
+    if (multiplier === 1) dirTemp += 'single';
+    else if (ISNOTMAM) dirTemp += 'triple';
+    else dirTemp += 'data';
+
+    if (ISLOCALPOW) dirTemp += '-LOCAL';
     if (SHOWPOW && ISNOTMAM) dirTemp += '-POW';
-    if (ISRANDOM) dirTemp += '-RANDOM/RANDOM-';
-    else dirTemp += '/';
-    const dir = dirTemp + new Date().toISOString();
+    if (ISDEVNET) dirTemp += '-DEVNET';
+
+    if (!fs.existsSync(dirTemp)) fs.mkdirSync(dirTemp);
+    const dir = dirTemp + '/' + new Date().toISOString();
 
     if (ISDEVNET) iotaProviders.push(devnetProv);
     else await setupProviders();
@@ -194,34 +241,37 @@ const init = async () => {
     if (ISLOCALPOW) MAM.setAttachToTangle(localAttachToTangle);
 
     // For each bus setup a MAM channel or IOTA api, then create a log file
-    for (let i = 0; i < bus.length; i++) {
+    for (let i = 0; i < busConst.length; i++) {
       const seed = iotaSeedGen();
-      // Bus object
-      busObjs[bus[i]] = {
-        channel: null,
-        csv: null,
-        seed
-      };
-
-      // Setup MAM Channel or IOTA api
       // Provider
       let provider = null;
-      if (ISRANDOM) provider = selectRandomProvider();
+      if (ISRANDOM || !KEEPINITIALP) provider = selectRandomProvider();
       else provider = selectProvider(i);
-      // Channel
+      // Bus object
+      bus[busConst[i]] = {
+        channel: null,
+        csv: null,
+        seed,
+        currentProvider: provider,
+        providersRTT: {},
+        waiting: new Set()
+      };
+      bus[busConst[i]].providersRTT[provider] = -1;
+
+      // Setup MAM Channel or IOTA api
       let tempChannel = null;
       if (ISNOTMAM) {
         tempChannel = IOTA.composeAPI({ provider: provider.hostname });
         if (ISLOCALPOW) tempChannel.attachToTangle = localAttachToTangle;
       } else {
-        tempChannel = MAM.init(provider.hostname, seed);
-        tempChannel = MAM.changeMode(tempChannel, 'private');
+        tempChannel = MAM.changeMode(MAM.init(tempProvider, seed), 'private');
       }
-      busObjs[bus[i]].channel = tempChannel;
+      bus[busConst[i]].channel = tempChannel;
 
       // Create log file
       if (!fs.existsSync(dir)) fs.mkdirSync(dir);
-      const filepath = (busObjs[bus[i]].csv = dir + '/bus-' + bus[i] + '.csv');
+      const filepath = (bus[busConst[i]].csv =
+        dir + '/bus-' + busConst[i] + '.csv');
       fs.writeFile(
         filepath,
         'attach,' +
@@ -264,24 +314,24 @@ const publish = async row => {
   try {
     startTime = new Date().getTime();
     // Prepare a bundle and signs it.
-    const trytes = await busObjs[row[1]].channel.prepareTransfers(
-      busObjs[row[1]].seed,
+    const trytes = await bus[row[1]].channel.prepareTransfers(
+      bus[row[1]].seed,
       transfers
     );
     // Does tip selection, attaches to tangle by doing PoW and broadcasts.
-    //const bundle = await busObjs[row[1]].channel.sendTrytes(trytes, 3, 14);
-    const { trunkTransaction, branchTransaction } = await busObjs[
+    //const bundle = await bus[row[1]].channel.sendTrytes(trytes, 3, 14);
+    const { trunkTransaction, branchTransaction } = await bus[
       row[1]
     ].channel.getTransactionsToApprove(3);
     tipsObtainedTime = new Date().getTime();
 
-    const attachedTrytes = await busObjs[row[1]].channel.attachToTangle(
+    const attachedTrytes = await bus[row[1]].channel.attachToTangle(
       trunkTransaction,
       branchTransaction,
       14,
       trytes
     );
-    await busObjs[row[1]].channel.storeAndBroadcast(attachedTrytes);
+    await bus[row[1]].channel.storeAndBroadcast(attachedTrytes);
     const bundle = attachedTrytes.map(t => tconverter.asTransactionObject(t));
     finishTime = new Date().getTime();
     attachmentTime = bundle[0].attachmentTimestamp;
@@ -311,7 +361,7 @@ const publish = async row => {
     console.log(row[1] + ': ' + err);
   } finally {
     fs.appendFile(
-      busObjs[row[1]].csv,
+      bus[row[1]].csv,
       startTime +
         ',' +
         (SHOWPOW ? tipsObtainedTime + ',' : '') +
@@ -338,8 +388,8 @@ const publishOnMAM = async (row, json) => {
   try {
     // Prepare message
     const trytes = converter.asciiToTrytes(JSON.stringify(json));
-    const message = MAM.create(busObjs[row[1]].channel, trytes);
-    busObjs[row[1]].channel = message.state;
+    const message = MAM.create(bus[row[1]].channel, trytes);
+    bus[row[1]].channel = message.state;
 
     // Attach the payload to the channel
     startTime = new Date().getTime();
@@ -366,7 +416,7 @@ const publishOnMAM = async (row, json) => {
     console.log(row[1] + ': ' + err);
   } finally {
     fs.appendFile(
-      busObjs[row[1]].csv,
+      bus[row[1]].csv,
       startTime + ',' + attachmentTime + ',' + finishTime + ',' + row[4] + '\n',
       err => {
         if (err) throw err;

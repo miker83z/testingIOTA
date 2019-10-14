@@ -1,7 +1,7 @@
 import os
 import csv
 
-startingDir = 'dataset/datat'
+startingDir = 'dataset/data'
 ISPOW = False
 
 
