@@ -201,33 +201,32 @@ const selectBestKnownProvider = b => {
     let provider = orderedBestProviders[i][0];
     if (!bus[b].waiting.has(provider)) return provider; // Assuming synced
   }
-  return orderedBestProviders[0][0]; // Should never occur
+  console.log('Providers error'); // Should never occur
+  return orderedBestProviders[0][0];
 };
 
 const chooseProviderAlgorithm = async b => {
   let p = bus[b].currentProvider;
-  if (ISRANDOM) {
-    p = (await fetchRandomProvider()).hostname;
-  } else {
-    // Choose the provider to use
-    // If current provider is in "waiting" for an attachment process, choose another one
-    if (bus[b].waiting.has(bus[b].currentProvider)) {
-      // If there are known providers not waiting, choose the best one
-      if (bus[b].waiting.size < Object.keys(bus[b].providersRTT).length)
-        p = selectBestKnownProvider(b).hostname;
-      // If every known provider is waiting for an attachment, search for a new one
-      else {
-        // If the provider found is aready known, search for a new one
-        while (
-          Object.keys(bus[b].providersRTT).includes(
-            (p = (await fetchRandomProvider()).hostname)
-          )
-        );
-        // Add the new provider to the known
-        bus[b].providersRTT[p] = -1;
-      }
+  // Choose the provider to use
+  // If current provider is in "waiting" for an attachment process, choose another one
+  if (p === undefined || bus[b].waiting.has(p)) {
+    // If there are known providers not waiting, choose the best one
+    if (bus[b].waiting.size < Object.keys(bus[b].providersRTT).length) {
+      p = selectBestKnownProvider(b);
+    }
+    // If every known provider is waiting for an attachment, search for a new one
+    else {
+      // If the provider found is aready known, search for a new one
+      while (
+        Object.keys(bus[b].providersRTT).includes(
+          (p = (await fetchRandomProvider()).hostname)
+        )
+      );
+      // Add the new provider to the known ones
+      bus[b].providersRTT[p] = -1;
     }
   }
+
   return p;
 };
 
@@ -267,7 +266,7 @@ const init = async () => {
         providersRTT: {},
         waiting: new Set()
       };
-      bus[busConst[i]].providersRTT[provider] = -1;
+      bus[busConst[i]].providersRTT[provider.hostname] = -1;
 
       // Setup MAM Channel
       if (!ISSINGLE)
@@ -334,7 +333,9 @@ const publish = async (b, id, json) => {
     provider = bus[b].currentProvider;
   try {
     if (!KEEPINITIALP) {
-      provider = await chooseProviderAlgorithm(b);
+      provider = ISRANDOM
+        ? (await fetchRandomProvider()).hostname
+        : await chooseProviderAlgorithm(b);
       bus[b].currentProvider = provider;
       bus[b].waiting.add(provider);
     }
@@ -394,10 +395,8 @@ const publish = async (b, id, json) => {
     console.log(b + ': ' + err);
     if (!KEEPINITIALP) {
       bus[b].waiting.delete(provider);
-      // Compute latency
-      tmpRTT = bus[b].providersRTT[provider];
-      if (tmpRTT > 0) bus[b].providersRTT[provider] = 10 * tmpRTT;
-      else bus[b].providersRTT[provider] = 100;
+      delete bus[b].providersRTT[provider];
+      bus[b].currentProvider = undefined;
     }
   } finally {
     fs.appendFile(
