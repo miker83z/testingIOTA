@@ -165,5 +165,3 @@ for i in range(len(startingDir)):
         round((allErrors[i] / (totalRequests * len(singleTestData[i]))), 4)))
 
 plt.show()
-
-check(1)
