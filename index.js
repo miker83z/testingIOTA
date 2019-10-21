@@ -242,7 +242,7 @@ const init = async () => {
     if (ISRANDOM) dirTemp += 'random/';
     else dirTemp += 'random-NOT/';
 
-    dirTemp += 'data';
+    dirTemp += 'data-12';
     if (ISLOCALPOW) dirTemp += '-LOCAL';
     if (ISDEVNET) dirTemp += '-DEVNET';
     if (!fs.existsSync(dirTemp)) fs.mkdirSync(dirTemp);
