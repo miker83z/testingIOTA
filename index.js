@@ -437,12 +437,12 @@ const go = async () => {
 };
 
 const main = async () => {
-  setupEnvironment();
-  await init();
-  await go();
-  console.log('Finished approximately at : ' + new Date().toString());
+  for (let i = 0; i < iterations; i++) {
+    setupEnvironment();
+    await init();
+    await go();
+    console.log('Finished approximately at : ' + new Date().toString());
+  }
 };
 
-for (let i = 0; i < iterations; i++) {
-  main();
-}
+main();

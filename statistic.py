@@ -12,26 +12,27 @@ def check(x):
 
 
 startingDir = ['dataset/keep/mam/random/data',
+               'dataset/keep-NOT/mam/random/data',
                'dataset/keep-NOT/mam/random-NOT/data']
 totalRequests = 447
-singleTestData = [[], []]
-allLatencies = [[], []]
-allErrors = [0, 0]
+singleTestData = [[], [], []]
+allLatencies = [[], [], []]
+allErrors = [0, 0, 0]
 errorsData = []
 tipsData = []
 tipsDataSTD = []
 powsData = []
 powsDataSTD = []
 
-widths = [2, 2]
+widths = [2, 2, 2]
 heights = [3, 1]
 gs_kw = dict(width_ratios=widths, height_ratios=heights)
-fig, axes = plt.subplots(nrows=2, ncols=2, sharey=True,
+fig, axes = plt.subplots(nrows=2, ncols=3, sharey=True,
                          sharex=True, constrained_layout=True, gridspec_kw=gs_kw)
 plt.ylim([0, 70000])
 fig.suptitle('Tips(orange) and POW(blue) avg latency', fontsize=16)
 
-for i in range(2):
+for i in range(len(startingDir)):
     path = os.walk(startingDir[i])
     next(path)
     for directory in path:
@@ -82,7 +83,8 @@ for i in range(2):
     spc = 0.015
     sxrange = np.arange(round(len(singleTestData[i])/6))
 
-    titl1 = 'Algorithm 1' if i == 0 else 'Algorithm 3'
+    inc = i + 1 if i < 1 else i + 2
+    titl1 = 'Algorithm ' + str(inc)
     ylab1 = 'Latency (ms)' if i == 0 else ''
     axes[0][i].set(ylabel=ylab1, title=titl1)
     axes[0][i].bar(sxrange, tipsData[i][0], width, color='tab:orange',
@@ -112,7 +114,7 @@ for i in range(2):
                    bottom=tipsData[i][5], color='tab:blue', align='center')
 
     ax2 = axes[0][i].twinx()
-    ylab2 = 'Errors % (red)' if i == 1 else ''
+    ylab2 = 'Errors % (red)' if i == 2 else ''
     ax2.set(ylabel=ylab2)
 
     ax2.bar(sxrange, errorsData[i][0], width2, color='tab:red', align='center')
@@ -156,9 +158,8 @@ for i in range(2):
                    (width/2), color='tab:blue', align='center')
 
     ylab3 = 'Latency (ms)' if i == 0 else ''
-    algNum = '1' if i == 0 else '3'
     axes[1][i].set(xlabel='Test ID', ylabel=ylab3,
-                   title='Latency STD - Algorithm ' + algNum)
+                   title='Latency STD - Algorithm ' + str(inc))
 
     print('Test ' + str(i) + ': Avg= ' + str(round(np.mean(allLatencies[i]), 4)) + ', Err%= ' + str(
         round((allErrors[i] / (totalRequests * len(singleTestData[i]))), 4)))
