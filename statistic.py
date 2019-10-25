@@ -43,11 +43,6 @@ totalRequests = 447
 singleTestData = []
 allLatencies = []
 allErrors = []
-errorsData = []
-tipsData = []
-tipsDataSTD = []
-powsData = []
-powsDataSTD = []
 
 for i in range(len(startingDir)):
     singleTestData.append([])
@@ -84,28 +79,6 @@ for i in range(len(startingDir)):
 
         singleTestData[i].append(tempTestData)
 
-    errorsData.append([])
-    tipsData.append([])
-    tipsDataSTD.append([])
-    powsData.append([])
-    powsDataSTD.append([])
-    groupDim = round(len(singleTestData[i]) / plotTestNumber)
-    x = 0
-    while x < len(singleTestData[i]):
-        tmp = [0, [], []]
-        for k in range(groupDim):
-            tmp[0] += int(singleTestData[i][x+k]['errors'])
-            tmp[1].extend(singleTestData[i][x+k]['tipsValue'])
-            tmp[2].extend(singleTestData[i][x+k]['powValue'])
-        x += groupDim
-
-        errorsData[i].append(
-            round(int(tmp[0]) / (totalRequests * groupDim), 4))
-        tipsData[i].append(round(np.mean(tmp[1]), 4))
-        tipsDataSTD[i].append(round(np.std(tmp[1]), 4))
-        powsData[i].append(round(np.mean(tmp[2]), 4))
-        powsDataSTD[i].append(round(np.std(tmp[2]), 4))
-
     print('Test ' + str(i) + ': Avg= ' + str(round(np.mean(allLatencies[i]), 4)) + ', Err%= ' + str(
         round((allErrors[i] / (totalRequests * len(singleTestData[i]))), 4)))
 
@@ -113,9 +86,12 @@ for i in range(len(startingDir)):
 def plot1(ids):
     widths = [2, 2, 2]
     heights = [3, 1]
-    gs_kw = dict(width_ratios=widths, height_ratios=heights)
+    width = .7
+    width2 = 0.2
+    sxrange = np.arange(plotTestNumber)
+
     fig, axes = plt.subplots(nrows=2, ncols=3, sharex=True,
-                             constrained_layout=True, gridspec_kw=gs_kw)
+                             constrained_layout=True, gridspec_kw=dict(width_ratios=widths, height_ratios=heights))
     # plt.ylim([0, 70000])
     # plt.yscale('log')
     #fig.suptitle('Transaction Insertion to IOTA: average latencies and errors', fontsize=16)
@@ -124,9 +100,30 @@ def plot1(ids):
     blue_patch = mpatches.Patch(color='tab:blue', label='PoWs')
 
     for i in range(len(ids)):
-        width = .7
-        width2 = 0.2
-        sxrange = np.arange(plotTestNumber)
+        errorsData = []
+        tipsData = []
+        tipsDataSTD = []
+        powsData = []
+        powsDataSTD = []
+        groupDim = round(len(singleTestData[ids[i]]) / plotTestNumber)
+        
+        sTestTemp = sorted(singleTestData[ids[i]], key=lambda x: x['name'])
+
+        x = 0
+        while x < len(sTestTemp):
+            tmp = [0, [], []]
+            for k in range(groupDim):
+                tmp[0] += int(sTestTemp[x+k]['errors'])
+                tmp[1].extend(sTestTemp[x+k]['tipsValue'])
+                tmp[2].extend(sTestTemp[x+k]['powValue'])
+            x += groupDim
+
+            errorsData.append(
+                round(int(tmp[0]) / (totalRequests * groupDim), 4))
+            tipsData.append(round(np.mean(tmp[1]), 4))
+            tipsDataSTD.append(round(np.std(tmp[1]), 4))
+            powsData.append(round(np.mean(tmp[2]), 4))
+            powsDataSTD.append(round(np.std(tmp[2]), 4))
 
         # First Row
         if i == 0:
@@ -138,19 +135,19 @@ def plot1(ids):
         ylab1 = 'Tips Selection and PoW Latency (ms)' if i == 0 else ''
         axes[0][i].set_ylabel(ylab1, fontsize=13)
         axes[0][i].set_title(titl1, fontdict = { 'fontsize' : 16} , weight='heavy')
-        axes[0][i].bar(sxrange, tipsData[ids[i]], width, color='tab:orange',
+        axes[0][i].bar(sxrange, tipsData, width, color='tab:orange',
                        align='center')
-        axes[0][i].bar(sxrange, powsData[ids[i]], width,
-                       bottom=tipsData[ids[i]], color='tab:blue', align='center')
+        axes[0][i].bar(sxrange, powsData, width,
+                       bottom=tipsData, color='tab:blue', align='center')
         if i > 0:
             axes[0][i].set_yticklabels([])
-        axes[0][i].set_ylim([0, 120000])
+        axes[0][i].set_ylim([0, 105000])
 
         # First Row Errors
         ax2 = axes[0][i].twinx()
         ylab2 = 'Errors (%)' if i == 2 else ''
         ax2.set_ylabel(ylab2, fontsize=13)
-        ax2.bar(sxrange, errorsData[ids[i]], width2,
+        ax2.bar(sxrange, errorsData, width2,
                 color='tab:red', align='center')
         if i < len(ids) - 1:
             ax2.set_yticklabels([])
@@ -160,16 +157,16 @@ def plot1(ids):
         ax2.set_ylim([0, 0.5])
 
         # Second Row
-        axes[1][i].bar(sxrange - (width/4), tipsDataSTD[ids[i]], (width/2), color='tab:orange',
+        axes[1][i].bar(sxrange - (width/4), tipsDataSTD, (width/2), color='tab:orange',
                        align='center')
-        axes[1][i].bar(sxrange + (width/4), powsDataSTD[ids[i]], (width/2), color='tab:blue',
+        axes[1][i].bar(sxrange + (width/4), powsDataSTD, (width/2), color='tab:blue',
                        align='center')
         ylab3 = 'Latency STD (ms)' if i == 0 else ''
         axes[1][i].set_xlabel('Test ID') 
         axes[1][i].set_ylabel(ylab3, fontsize=13)
         if i > 0:
             axes[1][i].set_yticklabels([])
-        axes[1][i].set_ylim([0, 170000])
+        axes[1][i].set_ylim([0, 180000])
 
 
 def plot2(ids):
@@ -217,8 +214,11 @@ def plot3():
     ax.scatter(positions, avg, color='w', marker='*', edgecolors='black', s=150, zorder=10)
 
 
-#plot1([0,3,6])
+plot1([0,3,6])
 plot2([2,5,8])
-#plot3()
+plot3()
+
+for i in range(len(startingDir)):
+    check(i)
 
 plt.show()
