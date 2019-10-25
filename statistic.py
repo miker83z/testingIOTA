@@ -185,7 +185,7 @@ def plot2(ids):
 
     for i in range(len(ids)):
         x,y = ecdf(np.array(allLatencies[ids[i]])/1000)
-        plt.scatter(x, y,color=colors[i%3], s=4);
+        plt.scatter(x, y,color=colors[i%3], s=4)
         plt.xlim([0.5,6500])
         
         #plt.hist(np.array(allLatencies[ids[i]])/1000, 10000, density=True, histtype='step', cumulative=True)
