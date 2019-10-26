@@ -16,7 +16,6 @@
     "axios": "^0.19.0",
     "ccurl.interface.js": "0.0.9",
     "command-line-args": "^5.1.1",
-    "csv-parser": "^2.3.0",
     "csv-writer": "^1.5.0",
     "n-readlines": "^1.0.0",
     "seedrandom": "^3.0.3",
