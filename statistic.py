@@ -3,6 +3,7 @@ import os
 import csv
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+import matplotlib.lines as mlines
 import numpy as np
 import math
 
@@ -13,13 +14,12 @@ def check(y):
             print(x['name'] + ' ' + str(len(x['tipsValue']) + x['errors']))
 
 
-def mean_confidence_interval(data, confidence=0.95):
+def confInt(data, confidence=0.95):
     a = 1.0 * np.array(data)
     n = len(a)
     m, se = np.mean(a), scipy.stats.sem(a)
     h = se * scipy.stats.t.ppf((1 + confidence) / 2., n-1)
-    return m, m-h, m+h
-
+    return round((m-h)/1000, 2), round((m+h)/1000, 2)
 
 def ecdf(data):
     x = np.sort(data)
@@ -30,14 +30,14 @@ def ecdf(data):
 
 startingDir = ['dataset/keep/mam/random/data',
                'dataset/keep/mam/random/data-12',
-               'dataset/keep/mam/random/data-12',
+               'dataset/keep/mam/random/data-24',
                'dataset/keep-NOT/mam/random/data',
                'dataset/keep-NOT/mam/random/data-12',
                'dataset/keep-NOT/mam/random/data-12',
                'dataset/keep-NOT/mam/random-NOT/data',
                'dataset/keep-NOT/mam/random-NOT/data-12',
-               'dataset/keep-NOT/mam/random-NOT/data-12']
-plotTestNumber = 12
+               'dataset/keep-NOT/mam/random-NOT/data-24']
+plotTestNumber = 6
 totalRequests = 447
 
 singleTestData = []
@@ -79,8 +79,8 @@ for i in range(len(startingDir)):
 
         singleTestData[i].append(tempTestData)
 
-    print('Test ' + str(i) + ': Avg= ' + str(round(np.mean(allLatencies[i]), 4)) + ', Err%= ' + str(
-        round((allErrors[i] / (totalRequests * len(singleTestData[i]))), 4)))
+    print('Test ' + str(i) + ': Avg= ' + str(round(np.mean(allLatencies[i])/1000, 2)) + ', Err%= ' + str(
+        round((allErrors[i] / (totalRequests * len(singleTestData[i])))*100, 2)) + ', ConfInt= ' + str(confInt(allLatencies[i])))
 
 
 def plot1(ids):
@@ -170,52 +170,76 @@ def plot1(ids):
 
 
 def plot2(ids):
-    colors = ['tab:green', 'tab:red', 'tab:cyan']
-    green_patch = mpatches.Patch(color='tab:green', label='Fixed Random')
-    red_patch = mpatches.Patch(color='tab:red', label='Dynamic Random')
-    cyan_patch = mpatches.Patch(color='tab:cyan', label='Adaptive RTT')
+    colors = ['tab:green', 'tab:orange', 'tab:blue']
+    patch1 = mpatches.Patch(color=colors[0], label='Fixed Random')
+    patch2 = mpatches.Patch(color=colors[1], label='Dynamic Random')
+    patch3 = mpatches.Patch(color=colors[2], label='Adaptive RTT')
+    soli = mlines.Line2D([], [], color='black', linestyle='solid', label='120 buses')
+    dott = mlines.Line2D([], [], color='black', linestyle='dotted', label='240 buses')
     plt.subplots(nrows=1, ncols=1, constrained_layout=True)
     plt.xscale('log')
     plt.ylabel("ECDF", fontsize=13)
     plt.xlabel("latency (sec)", fontsize=13)
-    plt.legend(handles=[green_patch, red_patch, cyan_patch], fontsize='large')
+    plt.legend(handles=[patch1, patch2, patch3, soli, dott], fontsize='large')
 
     for i in range(len(ids)):
+        l = ['solid', 'dotted']
         x,y = ecdf(np.array(allLatencies[ids[i]])/1000)
-        plt.scatter(x, y,color=colors[i%3], s=4)
+        plt.plot(x, y,color=colors[i%3], linestyle=l[math.floor(i/3)])
         plt.xlim([0.5,6500])
         
         #plt.hist(np.array(allLatencies[ids[i]])/1000, 10000, density=True, histtype='step', cumulative=True)
 
 
 def plot3():
-    _, ax = plt.subplots()
+    _, ax = plt.subplots(constrained_layout=True)
     plt.yscale('log')
     allLatenciesTemp = []
     avg = []
+    err = []
     for x in allLatencies:
         tmp = np.array(x)/1000
         allLatenciesTemp.append(tmp)
         avg.append(np.mean(tmp))
-    
+    for i in range(len(allErrors)):
+        err.append(allErrors[i] / (totalRequests * len(singleTestData[i])))
+
     positions = [1,1.6,2.2,3.2,3.8,4.4,5.4,6,6.6]
-    bp = ax.boxplot(allLatenciesTemp, positions= positions, sym='+', patch_artist=True)
-    ax.set_xticklabels(['60 bus','120 bus\n\nFixed Random','240 bus','60 bus','120 bus\n\nDynamic Random','240 bus','60 bus','120 bus\n\nAdaptive RTT','240 bus'], fontsize=13)
+    bp = ax.boxplot(allLatenciesTemp, positions= positions, sym='x', patch_artist=True)
+    ax.set_xticklabels(['60\nbuses','120\nbuses\n\nFixed Random','240\nbuses','60\nbuses','120\nbuses\n\nDynamic Random','240\nbuses','60\nbuses','120\nbuses\n\nAdaptive RTT','240\nbuses'], fontsize=13)
     ax.set_ylabel("latency (sec)", fontsize=13)
 
     i = 0
-    colors = ['tab:brown', 'tab:green', 'tab:cyan']
+    colors = ['tab:blue', 'tab:orange', 'tab:green']
     for box in bp['boxes']:
         box.set(facecolor= colors[i%3])
         i += 1
     for m in bp['medians']:
         m.set(color='tab:red')
 
-    ax.scatter(positions, avg, color='w', marker='*', edgecolors='black', s=150, zorder=10)
+    ax.scatter(positions, avg, color='w', marker='D', edgecolors='black', s=75, zorder=10)
+
+    ax2 = ax.twinx()
+    ylab2 = 'Errors (%)'
+    ax2.set_ylabel(ylab2, fontsize=13)
+    ax2.plot(positions[0:3], err[0:3], color='gold', marker='*', markeredgecolor='black', markersize=15, zorder=10)
+    ax2.plot(positions[3:6], err[3:6], color='gold', marker='*', markeredgecolor='black', markersize=15, zorder=10)
+    ax2.plot(positions[6:9], err[6:9], color='gold', marker='*', markeredgecolor='black', markersize=15, zorder=10)
+    ax2.set_ylim([0, 0.5])
+
+    star = mlines.Line2D([], [], color='gold', marker='*', linestyle='None', markeredgecolor='black',
+                          markersize=15, label='Errors')
+    diamond = mlines.Line2D([], [], color='w', marker='D', linestyle='None', markeredgecolor='black',
+                            markersize=10, label='Averages')
+    patch1 = mpatches.Patch(color=colors[0], label='60 buses')
+    patch2 = mpatches.Patch(color=colors[1], label='120 buses')
+    patch3 = mpatches.Patch(color=colors[2], label='240 buses')
+
+    ax.legend(handles=[patch1, patch2, patch3, star, diamond], fontsize='x-large')
 
 
-plot1([0,3,6])
-plot2([2,5,8])
+#plot1([0,3,6])
+#plot2([1,4,7,2,5,8])
 plot3()
 
 for i in range(len(startingDir)):
