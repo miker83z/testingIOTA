@@ -7,13 +7,6 @@ import matplotlib.lines as mlines
 import numpy as np
 import math
 
-
-def check(y):
-    for x in singleTestData[y]:
-        if len(x['tipsValue']) + x['errors'] != 447:
-            print(x['name'] + ' ' + str(len(x['tipsValue']) + x['errors']))
-
-
 def confInt(data, confidence=0.95):
     a = 1.0 * np.array(data)
     n = len(a)
@@ -33,7 +26,7 @@ startingDir = ['dataset/keep/mam/random/data',
                'dataset/keep/mam/random/data-24',
                'dataset/keep-NOT/mam/random/data',
                'dataset/keep-NOT/mam/random/data-12',
-               'dataset/keep-NOT/mam/random/data-12',
+               'dataset/keep-NOT/mam/random/data-24',
                'dataset/keep-NOT/mam/random-NOT/data',
                'dataset/keep-NOT/mam/random-NOT/data-12',
                'dataset/keep-NOT/mam/random-NOT/data-24']
@@ -76,6 +69,12 @@ for i in range(len(startingDir)):
                         tempTestData['tipsValue'].append(tipsValue)
                         allLatencies[i].append(tipsValue+powValue)
             csvFile.close()
+
+        if len(tempTestData['powValue']) + tempTestData['errors'] != totalRequests:
+            print('Check: ' + tempTestData['name'] + ' ' + str(len(tempTestData['powValue']) + tempTestData['errors']))
+            errorsNotWritten = totalRequests - len(tempTestData['powValue']) - tempTestData['errors']
+            tempTestData['errors'] += errorsNotWritten
+            allErrors[i] += errorsNotWritten
 
         singleTestData[i].append(tempTestData)
 
@@ -241,8 +240,5 @@ def plot3():
 #plot1([0,3,6])
 #plot2([1,4,7,2,5,8])
 plot3()
-
-for i in range(len(startingDir)):
-    check(i)
 
 plt.show()
