@@ -24,8 +24,8 @@ $ npm install
 $ node script.js
 ```
 
-- Case 1 :
-- Case 2 :
+- Case 1 - 'node script.js': For each bus, its associated provider changes every time a message has to be published, while the previous one is still pending. A new provider is chosen by selecting the best known provider or, if every known provider is in the process of publishing a message, a new provider is picked randomly from the public list. Known IOTA providers are ranked through the experienced Round Trip Time (RTT).
+- Case 2 - 'node scrpit.js -keepinitial': For each bus, its associated provider is set during an initial phase. A provider is chosen selecting one of the best providers, ranked by their computational power and number of neighbors.
 
 ### Command Line Arguments
 
@@ -37,7 +37,7 @@ Command line arguments are used to define a path to take during the testing exec
 - `-l` or `-localpow`: the POW is performed locally
 - `-d` or `-devnet`: the only provider used is https://nodes.devnet.thetangle.org that operates on the devnet
 - `-i` or `-iter`: number of iteration of the test (default 1)
-- `-w` or `-window`: window size when picking the best providers (default 10)
+- `-w` or `-window`: window size when picking the best providers in case 2 (default 10)
 - `-c` or `-ccurl`: relative path for ccurl library (default '../ccurl/build/lib')
 
 ### Dataset
