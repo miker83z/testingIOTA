@@ -1,10 +1,10 @@
-import scipy.stats
 import os
 import csv
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import matplotlib.lines as mlines
 import numpy as np
+import scipy.stats
 import math
 
 def confInt(data, confidence=0.95):
@@ -30,7 +30,7 @@ startingDir = ['dataset/keep/mam/random/data',
                'dataset/keep-NOT/mam/random-NOT/data',
                'dataset/keep-NOT/mam/random-NOT/data-12',
                'dataset/keep-NOT/mam/random-NOT/data-24']
-plotTestNumber = 6
+plotTestNumber60bus = 12
 totalRequests = 447
 
 singleTestData = []
@@ -87,13 +87,11 @@ def plot1(ids):
     heights = [3, 1]
     width = .7
     width2 = 0.2
-    sxrange = np.arange(plotTestNumber)
+    sxrange = np.arange(plotTestNumber60bus)
 
     fig, axes = plt.subplots(nrows=2, ncols=3, sharex=True,
                              constrained_layout=True, gridspec_kw=dict(width_ratios=widths, height_ratios=heights))
-    # plt.ylim([0, 70000])
-    # plt.yscale('log')
-    #fig.suptitle('Transaction Insertion to IOTA: average latencies and errors', fontsize=16)
+    fig.set_size_inches(19, 7.5)
     red_patch = mpatches.Patch(color='tab:red', label='Errors')
     orange_patch = mpatches.Patch(color='tab:orange', label='Tips')
     blue_patch = mpatches.Patch(color='tab:blue', label='PoWs')
@@ -104,7 +102,7 @@ def plot1(ids):
         tipsDataSTD = []
         powsData = []
         powsDataSTD = []
-        groupDim = round(len(singleTestData[ids[i]]) / plotTestNumber)
+        groupDim = round(len(singleTestData[ids[i]]) / plotTestNumber60bus)
         
         sTestTemp = sorted(singleTestData[ids[i]], key=lambda x: x['name'])
 
@@ -170,12 +168,14 @@ def plot1(ids):
 
 def plot2(ids):
     colors = ['tab:green', 'tab:orange', 'tab:blue']
+    linesize = [ 2, 3 ]
     patch1 = mpatches.Patch(color=colors[0], label='Fixed Random')
     patch2 = mpatches.Patch(color=colors[1], label='Dynamic Random')
     patch3 = mpatches.Patch(color=colors[2], label='Adaptive RTT')
     soli = mlines.Line2D([], [], color='black', linestyle='solid', label='120 buses')
     dott = mlines.Line2D([], [], color='black', linestyle='dotted', label='240 buses')
-    plt.subplots(nrows=1, ncols=1, constrained_layout=True)
+    fig, _ = plt.subplots(nrows=1, ncols=1, constrained_layout=True)
+    fig.set_size_inches(8, 6)
     plt.xscale('log')
     plt.ylabel("ECDF", fontsize=13)
     plt.xlabel("latency (sec)", fontsize=13)
@@ -184,14 +184,13 @@ def plot2(ids):
     for i in range(len(ids)):
         l = ['solid', 'dotted']
         x,y = ecdf(np.array(allLatencies[ids[i]])/1000)
-        plt.plot(x, y,color=colors[i%3], linestyle=l[math.floor(i/3)])
+        plt.plot(x, y,color=colors[i%3], linestyle=l[math.floor(i/3)], linewidth= linesize[math.floor(i/3)])
         plt.xlim([0.5,6500])
-        
-        #plt.hist(np.array(allLatencies[ids[i]])/1000, 10000, density=True, histtype='step', cumulative=True)
 
 
 def plot3():
-    _, ax = plt.subplots(constrained_layout=True)
+    fig, ax = plt.subplots(constrained_layout=True)
+    fig.set_size_inches(11, 11)
     plt.yscale('log')
     allLatenciesTemp = []
     avg = []
@@ -218,27 +217,27 @@ def plot3():
 
     ax.scatter(positions, avg, color='w', marker='D', edgecolors='black', s=75, zorder=10)
 
-    ax2 = ax.twinx()
-    ylab2 = 'Errors (%)'
-    ax2.set_ylabel(ylab2, fontsize=13)
-    ax2.plot(positions[0:3], err[0:3], color='gold', marker='*', markeredgecolor='black', markersize=15, zorder=10)
-    ax2.plot(positions[3:6], err[3:6], color='gold', marker='*', markeredgecolor='black', markersize=15, zorder=10)
-    ax2.plot(positions[6:9], err[6:9], color='gold', marker='*', markeredgecolor='black', markersize=15, zorder=10)
-    ax2.set_ylim([0, 0.5])
+    # ax2 = ax.twinx()
+    # ylab2 = 'Errors (%)'
+    # ax2.set_ylabel(ylab2, fontsize=13)
+    # ax2.plot(positions[0:3], err[0:3], color='gold', marker='*', markeredgecolor='black', markersize=15, zorder=10)
+    # ax2.plot(positions[3:6], err[3:6], color='gold', marker='*', markeredgecolor='black', markersize=15, zorder=10)
+    # ax2.plot(positions[6:9], err[6:9], color='gold', marker='*', markeredgecolor='black', markersize=15, zorder=10)
+    # ax2.set_ylim([0, 0.5])
 
-    star = mlines.Line2D([], [], color='gold', marker='*', linestyle='None', markeredgecolor='black',
-                          markersize=15, label='Errors')
+    # star = mlines.Line2D([], [], color='gold', marker='*', linestyle='None', markeredgecolor='black',
+    #                      markersize=15, label='Errors')
     diamond = mlines.Line2D([], [], color='w', marker='D', linestyle='None', markeredgecolor='black',
                             markersize=10, label='Averages')
     patch1 = mpatches.Patch(color=colors[0], label='60 buses')
     patch2 = mpatches.Patch(color=colors[1], label='120 buses')
     patch3 = mpatches.Patch(color=colors[2], label='240 buses')
 
-    ax.legend(handles=[patch1, patch2, patch3, star, diamond], fontsize='x-large')
+    ax.legend(handles=[patch1, patch2, patch3, diamond], fontsize='x-large')
 
 
-#plot1([0,3,6])
-#plot2([1,4,7,2,5,8])
+plot1([0,3,6])
+plot2([1,4,7,2,5,8])
 plot3()
 
 plt.show()
