@@ -1,3 +1,4 @@
+[![DOI](https://zenodo.org/badge/210110057.svg)](https://zenodo.org/badge/latestdoi/210110057)
 # Testing IOTA
 
 Testing aimed to evaluate the performances of IOTA DLT in a vehicular scenario. The script takes in input `inputDataset.csv` in order to simulate buses sending data (latitude ,longitude) to a IOTA MAM channel.
