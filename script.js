@@ -58,13 +58,13 @@ const alpha = 1 / 4;
 const busConst = [
   '110',
   '226',
-  '371',
-  '426',
-  '512',
+  //'371',
+  //'426',
+  //'512',
   '639',
-  '650',
+  //'650',
   '889',
-  '484',
+  //'484',
   '422'
 ];
 let iotaProviders, bus, latestMilestones, bestScore, previousFetch;
@@ -165,6 +165,13 @@ const setupProviders = async () => {
     if (!ISRANDOM) {
       iotaProviders = iotaProviders.slice(0, providersWindow);
       shuffle(iotaProviders, { rng: seedrandom() });
+      iotaProviders = [
+        {
+          hostname: 'https://nodes.thetangle.org:443',
+          latestMil: 234,
+          score: 1
+        }
+      ];
     }
   }
 };
@@ -424,13 +431,16 @@ const go = async () => {
     let line = liner.next(); // read first line
     while ((line = liner.next())) {
       let row = line.toString('ascii').split(',');
-      console.log('Waiting ' + row[0] + ' seconds for bus ' + row[1]);
+      //console.log('Waiting ' + row[0] + ' seconds for bus ' + row[1]);
+      console.log('Waiting ' + row[0]);
       await sleep(parseInt(row[0]) * 1000);
-
-      publish(row[1], row[4], {
-        payload: { latitude: row[2], longitude: row[3] },
-        timestampISO: new Date().toISOString()
-      });
+      if (busConst.includes(row[1])) {
+        console.log('Waited ' + row[0] + ' seconds for bus ' + row[1]);
+        publish(row[1], row[4], {
+          payload: { latitude: row[2], longitude: row[3] },
+          timestampISO: new Date().toISOString()
+        });
+      }
     }
   } catch (error) {
     console.log(error);

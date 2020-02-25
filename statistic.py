@@ -7,6 +7,24 @@ import numpy as np
 import scipy.stats
 import math
 
+startingDir = ['dataset/keep/mam/random/data',
+               'dataset/keep/mam/random/data-12',
+               'dataset/keep/mam/random/data-24',
+               'dataset/keep-NOT/mam/random/data',
+               'dataset/keep-NOT/mam/random/data-12',
+               'dataset/keep-NOT/mam/random/data-24',
+               'dataset/keep-NOT/mam/random-NOT/data',
+               'dataset/keep-NOT/mam/random-NOT/data-12',
+               'dataset/keep-NOT/mam/random-NOT/data-24']
+plotTestNumber60bus = 12
+totalRequests = 447
+
+locPowTestData = []
+singleTestData = []
+allLatencies = []
+allErrors = []
+
+
 def confInt(data, confidence=0.95):
     a = 1.0 * np.array(data)
     n = len(a)
@@ -20,29 +38,53 @@ def ecdf(data):
     y = np.arange(1, n+1) / n
     return(x,y)
 
+def get_data():
+    for i in range(len(startingDir)):
+        singleTestData.append([])
+        allLatencies.append([])
+        allErrors.append(0)
 
-startingDir = ['dataset/keep/mam/random/data',
-               'dataset/keep/mam/random/data-12',
-               'dataset/keep/mam/random/data-24',
-               'dataset/keep-NOT/mam/random/data',
-               'dataset/keep-NOT/mam/random/data-12',
-               'dataset/keep-NOT/mam/random/data-24',
-               'dataset/keep-NOT/mam/random-NOT/data',
-               'dataset/keep-NOT/mam/random-NOT/data-12',
-               'dataset/keep-NOT/mam/random-NOT/data-24']
-plotTestNumber60bus = 12
-totalRequests = 447
+        path = os.walk(startingDir[i])
+        next(path)
+        for directory in path:
+            tempTestData = {
+                'name': directory[0].split('/')[-1],
+                'tipsValue': [],
+                'powValue': [],
+                'errors': 0
+            }
+            for csvFilename in directory[2]:
+                with open(directory[0]+'/'+csvFilename, 'r') as csvFile:
+                    reader = csv.reader(csvFile)
+                    next(reader)
+                    for row in reader:
+                        srt = int(row[0])
+                        tips = int(row[1])
+                        fin = int(row[2])
+                        if fin == -1:
+                            tempTestData['errors'] += 1
+                            allErrors[i] += 1
+                        else:
+                            tipsValue = tips - srt
+                            powValue = fin - tips
+                            tempTestData['powValue'].append(powValue)
+                            tempTestData['tipsValue'].append(tipsValue)
+                            allLatencies[i].append(tipsValue+powValue)
+                csvFile.close()
 
-singleTestData = []
-allLatencies = []
-allErrors = []
+            if len(tempTestData['powValue']) + tempTestData['errors'] != totalRequests:
+                print('Check: ' + tempTestData['name'] + ' ' + str(len(tempTestData['powValue']) + tempTestData['errors']))
+                errorsNotWritten = totalRequests - len(tempTestData['powValue']) - tempTestData['errors']
+                tempTestData['errors'] += errorsNotWritten
+                allErrors[i] += errorsNotWritten
 
-for i in range(len(startingDir)):
-    singleTestData.append([])
-    allLatencies.append([])
-    allErrors.append(0)
+            singleTestData[i].append(tempTestData)
 
-    path = os.walk(startingDir[i])
+        print('Test ' + str(i) + ': Avg= ' + str(round(np.mean(allLatencies[i])/1000, 2)) + ', Err%= ' + str(
+            round((allErrors[i] / (totalRequests * len(singleTestData[i])))*100, 2)) + ', ConfInt= ' + str(confInt(allLatencies[i])))
+
+def get_local_data():
+    path = os.walk('dataset/keep/mam/random-NOT/data-LOCAL')
     next(path)
     for directory in path:
         tempTestData = {
@@ -59,28 +101,27 @@ for i in range(len(startingDir)):
                     srt = int(row[0])
                     tips = int(row[1])
                     fin = int(row[2])
-                    if fin is -1:
+                    if fin == -1:
                         tempTestData['errors'] += 1
-                        allErrors[i] += 1
                     else:
                         tipsValue = tips - srt
                         powValue = fin - tips
                         tempTestData['powValue'].append(powValue)
                         tempTestData['tipsValue'].append(tipsValue)
-                        allLatencies[i].append(tipsValue+powValue)
             csvFile.close()
+        locPowTestData.append(tempTestData)
 
-        if len(tempTestData['powValue']) + tempTestData['errors'] != totalRequests:
-            print('Check: ' + tempTestData['name'] + ' ' + str(len(tempTestData['powValue']) + tempTestData['errors']))
-            errorsNotWritten = totalRequests - len(tempTestData['powValue']) - tempTestData['errors']
-            tempTestData['errors'] += errorsNotWritten
-            allErrors[i] += errorsNotWritten
+    locPowTestData.sort(key=lambda x: x['name'])
+    localGroups = []
+    localGroups.append(locPowTestData[1:4])
+    localGroups.append(locPowTestData[4:7])
+    localGroups.append(locPowTestData[0:1])
 
-        singleTestData[i].append(tempTestData)
-
-    print('Test ' + str(i) + ': Avg= ' + str(round(np.mean(allLatencies[i])/1000, 2)) + ', Err%= ' + str(
-        round((allErrors[i] / (totalRequests * len(singleTestData[i])))*100, 2)) + ', ConfInt= ' + str(confInt(allLatencies[i])))
-
+    for group in localGroups:
+        groupLatencies = []
+        for test in group:
+            groupLatencies.extend(test['powValue'])
+        print('LOCAL Test: Avg= ' + str(round(np.mean(groupLatencies)/1000, 2)) + ', ConfInt= ' + str(confInt(groupLatencies)))
 
 def plot1(ids):
     widths = [2, 2, 2]
@@ -191,7 +232,8 @@ def plot2(ids):
 def plot3():
     fig, ax = plt.subplots(constrained_layout=True)
     fig.set_size_inches(11, 11)
-    plt.yscale('log')
+    #plt.yscale('log')
+    plt.ylim([0.5,300])
     allLatenciesTemp = []
     avg = []
     err = []
@@ -235,9 +277,10 @@ def plot3():
 
     ax.legend(handles=[patch1, patch2, patch3, diamond], fontsize='x-large')
 
-
-plot1([0,3,6])
-plot2([1,4,7,2,5,8])
-plot3()
+#get_data()
+get_local_data()
+#plot1([0,3,6])
+#plot2([1,4,7,2,5,8])
+#plot3()
 
 plt.show()
