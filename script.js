@@ -58,13 +58,13 @@ const alpha = 1 / 4;
 const busConst = [
   '110',
   '226',
-  //'371',
-  //'426',
-  //'512',
+  '371',
+  '426',
+  '512',
   '639',
-  //'650',
+  '650',
   '889',
-  //'484',
+  '484',
   '422'
 ];
 let iotaProviders, bus, latestMilestones, bestScore, previousFetch;

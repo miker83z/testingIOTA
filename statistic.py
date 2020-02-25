@@ -115,7 +115,11 @@ def get_local_data():
     localGroups = []
     localGroups.append(locPowTestData[1:4])
     localGroups.append(locPowTestData[4:7])
-    localGroups.append(locPowTestData[0:1])
+    tmpListLoc = []
+    tmpListLoc.append(locPowTestData[0])
+    tmpListLoc.append(locPowTestData[7])
+    tmpListLoc.append(locPowTestData[8])
+    localGroups.append(tmpListLoc)
 
     for group in localGroups:
         groupLatencies = []
@@ -299,11 +303,11 @@ def plot4():
     ax.plot(xs, avg[6:9], color=colors[2])
     ax.legend(handles=[patch1, patch2, patch3], fontsize='large')
 
-get_data()
+#get_data()
 get_local_data()
-plot1([0,3,6])
-plot2([1,4,7,2,5,8])
-plot3()
-plot4()
+#plot1([0,3,6])
+#plot2([1,4,7,2,5,8])
+#plot3()
+#plot4()
 
 plt.show()
