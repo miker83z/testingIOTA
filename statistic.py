@@ -219,7 +219,7 @@ def plot2(ids):
     fig.set_size_inches(8, 6)
     plt.xscale('log')
     plt.ylabel("ECDF", fontsize=13)
-    plt.xlabel("latency (sec)", fontsize=13)
+    plt.xlabel("latency (sec) (in log scale)", fontsize=13)
     plt.legend(handles=[patch1, patch2, patch3, soli, dott], fontsize='large')
 
     for i in range(len(ids)):
@@ -232,8 +232,7 @@ def plot2(ids):
 def plot3():
     fig, ax = plt.subplots(constrained_layout=True)
     fig.set_size_inches(11, 11)
-    #plt.yscale('log')
-    plt.ylim([0.5,300])
+    plt.yscale('log')
     allLatenciesTemp = []
     avg = []
     err = []
@@ -247,7 +246,7 @@ def plot3():
     positions = [1,1.6,2.2,3.2,3.8,4.4,5.4,6,6.6]
     bp = ax.boxplot(allLatenciesTemp, positions= positions, sym='x', patch_artist=True)
     ax.set_xticklabels(['60\nbuses','120\nbuses\n\nFixed Random','240\nbuses','60\nbuses','120\nbuses\n\nDynamic Random','240\nbuses','60\nbuses','120\nbuses\n\nAdaptive RTT','240\nbuses'], fontsize=13)
-    ax.set_ylabel("latency (sec)", fontsize=13)
+    ax.set_ylabel("latency (sec) (in log scale)", fontsize=13)
 
     i = 0
     colors = ['tab:blue', 'tab:orange', 'tab:green']
@@ -257,7 +256,10 @@ def plot3():
     for m in bp['medians']:
         m.set(color='tab:red')
 
-    ax.scatter(positions, avg, color='w', marker='D', edgecolors='black', s=75, zorder=10)
+    #ax.scatter(positions, avg, color='w', marker='D', edgecolors='black', s=75, zorder=10)
+    #ax.plot(positions[0:3], avg[0:3], color='tab:red', zorder=9)
+    #ax.plot(positions[3:6], avg[3:6], color='tab:red', zorder=9)
+    #ax.plot(positions[6:9], avg[6:9], color='tab:red', zorder=9)
 
     # ax2 = ax.twinx()
     # ylab2 = 'Errors (%)'
@@ -269,18 +271,39 @@ def plot3():
 
     # star = mlines.Line2D([], [], color='gold', marker='*', linestyle='None', markeredgecolor='black',
     #                      markersize=15, label='Errors')
-    diamond = mlines.Line2D([], [], color='w', marker='D', linestyle='None', markeredgecolor='black',
-                            markersize=10, label='Averages')
+    #diamond = mlines.Line2D([], [], color='w', marker='D', linestyle='None', markeredgecolor='black',
+    #                        markersize=10, label='Averages')
     patch1 = mpatches.Patch(color=colors[0], label='60 buses')
     patch2 = mpatches.Patch(color=colors[1], label='120 buses')
     patch3 = mpatches.Patch(color=colors[2], label='240 buses')
 
-    ax.legend(handles=[patch1, patch2, patch3, diamond], fontsize='x-large')
+    ax.legend(handles=[patch1, patch2, patch3], fontsize='x-large')
 
-#get_data()
+
+def plot4():
+    colors = ['tab:green', 'tab:orange', 'tab:blue']
+    patch1 = mpatches.Patch(color=colors[0], label='Fixed Random')
+    patch2 = mpatches.Patch(color=colors[1], label='Dynamic Random')
+    patch3 = mpatches.Patch(color=colors[2], label='Adaptive RTT')
+    fig, ax = plt.subplots(constrained_layout=True)
+    fig.set_size_inches(8, 6)
+    plt.ylabel("latency (sec)", fontsize=13)
+    plt.xlabel("# buses", fontsize=13)
+    avg = []
+    for x in allLatencies:
+        tmp = np.array(x)/1000
+        avg.append(np.mean(tmp))
+    xs = ['60', '120', '240']
+    ax.plot(xs, avg[0:3], color=colors[0])
+    ax.plot(xs, avg[3:6], color=colors[1])
+    ax.plot(xs, avg[6:9], color=colors[2])
+    ax.legend(handles=[patch1, patch2, patch3], fontsize='large')
+
+get_data()
 get_local_data()
-#plot1([0,3,6])
-#plot2([1,4,7,2,5,8])
-#plot3()
+plot1([0,3,6])
+plot2([1,4,7,2,5,8])
+plot3()
+plot4()
 
 plt.show()
