@@ -119,7 +119,7 @@ const go = async () => {
 };
 
 const main = async () => {
-  //await sleep(30000);
+  await sleep(30000);
   setupEnvironment();
   await init();
   await go();
