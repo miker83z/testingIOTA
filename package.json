@@ -17,6 +17,7 @@
     "ccurl.interface.js": "0.0.9",
     "command-line-args": "^5.1.1",
     "csv-writer": "^1.5.0",
+    "ipfs-http-client": "^42.0.0",
     "n-readlines": "^1.0.0",
     "seedrandom": "^3.0.3",
     "shuffle-array": "^1.0.1"
