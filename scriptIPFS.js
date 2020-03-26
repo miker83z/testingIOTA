@@ -3,8 +3,8 @@ const lineByLine = require('n-readlines');
 const createCsvWriter = require('csv-writer');
 const ipfsAPI = require('ipfs-http-client');
 const ipfs = ipfsAPI({
-  host: 'ipfs.infura.io',
-  port: '5001',
+  host: 'controversial-media.com',
+  port: '443',
   protocol: 'https'
 });
 
@@ -36,7 +36,7 @@ const sleep = ms => {
 const init = async () => {
   try {
     // Directory
-    let dirTemp = 'datasetIPFS/dataInfura';
+    let dirTemp = 'datasetIPFS/dataProp';
     if (!fs.existsSync(dirTemp)) fs.mkdirSync(dirTemp);
     const dir = dirTemp + '/' + new Date().toISOString();
 
@@ -119,7 +119,7 @@ const go = async () => {
 };
 
 const main = async () => {
-  await sleep(30000);
+  await sleep(10000);
   setupEnvironment();
   await init();
   await go();

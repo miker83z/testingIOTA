@@ -7,9 +7,9 @@ import numpy as np
 import scipy.stats
 import math
 
-startingDir = ['datasetIPFS/dataInfura0',
-               'datasetIPFS/dataIPFS',
-               'datasetIPFS/dataSIA']
+startingDir = ['datasetIPFS/dataSia',
+               'datasetIPFS/dataInfura',
+               'datasetIPFS/dataPriv']
 totalRequests = 79
 
 singleTestData = []
@@ -45,7 +45,7 @@ def get_data():
                     reader = csv.reader(csvFile)
                     next(reader)
                     for row in reader:
-                        if flag:
+                        if not flag:
                             value = int(row[4])
                             tempTestData['value'].append(value)
                             allLatencies[i].append(value)
@@ -74,14 +74,14 @@ def get_data():
         print('Test ' + str(i) + ': Avg= ' + str(round(np.mean(allLatencies[i])/1000, 2)) + ', Err%= ' + str(
             round((allErrors[i] / (totalRequests * len(singleTestData[i])))*100, 2)) + ', ConfInt= ' + str(confInt(allLatencies[i])))
         flag = True
-    allLatencies[0], allLatencies[1] = allLatencies[1], allLatencies[0]
+    allLatencies[0], allLatencies[2] = allLatencies[2], allLatencies[0]
 
 
 def plot():
     fig, ax = plt.subplots(constrained_layout=True)
-    fig.set_size_inches(11, 11)
-    plt.yscale('log')
-    #plt.ylim([0, 15])
+    fig.set_size_inches(7, 7)
+    # plt.yscale('log')
+    plt.ylim([0, 18])
     allLatenciesTemp = []
     avg = []
     err = []
@@ -92,12 +92,12 @@ def plot():
     for i in range(len(allErrors)):
         err.append(allErrors[i] / (totalRequests * len(singleTestData[i])))
 
-    positions = [1, 1.6, 2.2]  # , 3.2, 3.8, 4.4, 5.4, 6, 6.6]
+    positions = [.5, 1, 1.5]
     bp = ax.boxplot(allLatenciesTemp, positions=positions,
                     sym='x', patch_artist=True)
     ax.set_xticklabels(
-        ['IPFS Local', 'IPFS Remote\n(Infura)', 'Sia\n(Skynet)'], fontsize=13)
-    ax.set_ylabel("latency (sec) (log scale)", fontsize=13)
+        ['IPFS Private', 'IPFS Public\n(Infura)', 'Sia\n(Skynet)'], fontsize=13)
+    ax.set_ylabel("latency (sec)", fontsize=13)
 
     i = 0
     colors = ['tab:blue', 'tab:orange', 'tab:green']
